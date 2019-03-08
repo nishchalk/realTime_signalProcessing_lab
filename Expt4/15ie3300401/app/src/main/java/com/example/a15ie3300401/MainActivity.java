@@ -13,14 +13,18 @@ import android.widget.TextView;
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
 
     private SensorManager sensorManager;
-    private Sensor accelerometer, linearAccelerometer, magnetometer;
-    private static final float NS2S = 1.0f / 1000000000.0f;
+    private Sensor accelerometer, linearAccelerometer, magnetometer, stepCount;
+    private static final float NS2S = 1.0f / 1000000000.0f; //according to android timestamp documentation, should be 1/1000
     private float timestamp;
-    private float dTa[] = {0,0,0};
-    private float distance=0;
-    private float[] mGravity;
-    private float[] mGeomagnetic;
+    private float dTa[] = {0,0,0}; //time of activity
+    private float distance=0; //distance
+    private float[] mGravity; //to store accelerometer sensor values (with gravity): 0,1,2
+    private float[] mGeomagnetic; // to save magnetometer sensor values: 0,1,2
+    private float[] mAcceleration; // to save accelerometer sensor values (without gravity): 0,1,2
+    private float mstepCount = 0; //to store step count
+
     private static final float VALUE_DRIFT = 0.05f;
+    static final float ALPHA = 0.25f; // if ALPHA = 1 OR 0, no filter applies (low pass filter).
 
     TextView pitch_text, roll_text, azimuth_text, ax_text, ay_text, az_text, speed_text, distance_text, current_activity_text, dts, dtw, dtr ;
 
@@ -49,22 +53,39 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         linearAccelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        stepCount = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
 
         if(linearAccelerometer!=null){
-            sensorManager.registerListener(this,linearAccelerometer, sensorManager.SENSOR_DELAY_UI);
+            sensorManager.registerListener(this,linearAccelerometer, sensorManager.SENSOR_DELAY_NORMAL);
         }
         if(accelerometer!=null){
-            sensorManager.registerListener(this, accelerometer, sensorManager.SENSOR_DELAY_UI);
+            sensorManager.registerListener(this, accelerometer, sensorManager.SENSOR_DELAY_NORMAL);
         }
         if(magnetometer!=null){
-            sensorManager.registerListener(this,magnetometer,sensorManager.SENSOR_DELAY_UI);
+            sensorManager.registerListener(this,magnetometer,sensorManager.SENSOR_DELAY_NORMAL);
         }
+        if(stepCount!=null){
+            sensorManager.registerListener(this,stepCount, sensorManager.SENSOR_DELAY_NORMAL);
+        }
+    }
+
+    protected float[] lowPass( float[] input, float[] output ) {
+        if ( output == null ) return input;
+
+        for ( int i=0; i<input.length; i++ ) {
+            output[i] = output[i] + ALPHA * (input[i] - output[i]);
+        }
+        return output;
     }
 
     boolean capturingData = true;
 
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
+
+        if(capturingData && sensorEvent.sensor.getType() == Sensor.TYPE_STEP_COUNTER){
+            mstepCount = sensorEvent.values[0];
+        }
 
         if(capturingData && sensorEvent.sensor.getType() == Sensor.TYPE_ACCELEROMETER){
             mGravity = sensorEvent.values;
@@ -106,12 +127,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
             float x,y,z;
             double normal;
-            float vx,vy,vz,speed;
+            double vx,vy,vz,speed;
 
             String myactivity;
-            x = sensorEvent.values[0];
-            y = sensorEvent.values[1];
-            z = sensorEvent.values[2];
+
+            mAcceleration = lowPass(sensorEvent.values.clone(), sensorEvent.values);
+
+            x = mAcceleration[0];
+            y = mAcceleration[1];
+            z = mAcceleration[2];
 
             normal=Math.sqrt(x * x + y * y + z * z);
 
@@ -122,8 +146,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             vz = z*dT;
 
             speed = (float) (Math.sqrt(vx*vx + vy*vy + vz*vz)) ;
+            //speed = normal*dT;
             if (speed < 0.05) {
-                speed = 0 ;
+                //speed = 0 ;
                 myactivity = "Still";
                 dTa[0] += dT;
             }
@@ -141,7 +166,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             speed_text.setText(String.format("%.2f m/s",speed));
 
-            distance += speed*dT;
+            distance += speed*dT + 0.5*normal*dT*dT;
 
             distance_text.setText(String.format("%.2f m",distance));
 
@@ -150,7 +175,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             dtw.setText(String.format("%.2f s",dTa[1]));
             dtr.setText(String.format("%.2f s",dTa[2]));
 
-            final String textdata = String.format("t=%d dT=%f x=%f y=%f z=%f acceleration=%f  vx=%f vy=%f vz=%f speed=%f activity=%s still=%f walking=%f running=%f distance=%f", timeStamp,dT,x,y,z,normal,vx,vy,vz,speed, myactivity, dTa[0], dTa[1], dTa[2], distance);
+            final String textdata = String.format("t=%d dT=%f x=%f y=%f z=%f acceleration=%f  vx=%f vy=%f vz=%f speed=%f activity=%s still=%f walking=%f running=%f distance=%f stepCount=%f", timeStamp,dT,x,y,z,normal,vx,vy,vz,speed, myactivity, dTa[0], dTa[1], dTa[2], distance, mstepCount);
 
             Log.v("Accelerometer", textdata);
 
