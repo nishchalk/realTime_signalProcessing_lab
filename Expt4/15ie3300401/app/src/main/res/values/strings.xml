@@ -20,5 +20,7 @@
     <string name="walking">WALKING</string>
     <string name="running">RUNNING</string>
 
+    <string name="steps">stepCount</string>
+
     <string name="disclaimer">Distance covered measures the total distance covered from the start of the application. STILL/WALING/RUNNING measures the total time the activity happened from the start of the application</string>
 </resources>
