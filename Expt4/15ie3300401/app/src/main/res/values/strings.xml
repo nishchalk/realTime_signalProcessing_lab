@@ -12,15 +12,19 @@
     <string name="yaxis">Y-axis</string>
     <string name="zaxis">Z-axis</string>
 
-    <string name="speed">Instantaneous Velocity</string>
-    <string name="distance">Distance Covered</string>
+    <string name="speed">Instantaneous Velocity: </string>
+    <string name="distance">Distance Covered: </string>
 
-    <string name="activity">Current Activity</string>
+    <string name="activity">Current Activity: </string>
     <string name="still">STILL</string>
     <string name="walking">WALKING</string>
     <string name="running">RUNNING</string>
 
-    <string name="steps">stepCount</string>
+    <string name="steps">Step Taken: </string>
+
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
+    <string name="reset">Reset</string>
 
     <string name="disclaimer">Distance covered measures the total distance covered from the start of the application. STILL/WALING/RUNNING measures the total time the activity happened from the start of the application</string>
 </resources>

@@ -19,10 +19,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private float timestamp;
     private float dTa[] = {0,0,0}; //time of activity
     private float distance=0; //distance
-    private int mstepCount = 0; //to store step count
+    private double speed; //instantaneous speed
+    private int mstepCount = 0, counterSteps = 0; //to store step count
     private float[] mGravity; //to store accelerometer sensor values (with gravity): 0,1,2
     private float[] mGeomagnetic; // to save magnetometer sensor values: 0,1,2
     private float[] mAcceleration; // to save accelerometer sensor values (without gravity): 0,1,2
+    private float azimuth, pitch, roll;
+    private String myactivity; //current activity of user.
 
     private static final float VALUE_DRIFT = 0.05f;
     static final float ALPHA = 0.25f; // if ALPHA = 1 OR 0, no filter applies (low pass filter).
@@ -52,12 +55,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         stepCount_text = findViewById(R.id.stepCount_text);
 
+        //register sensors
         sensorManager =(SensorManager) getSystemService(Context.SENSOR_SERVICE);
         linearAccelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-        stepCount = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
+        stepCount = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
 
+        //register sensor listeners
         if(linearAccelerometer!=null){
             sensorManager.registerListener(this,linearAccelerometer, sensorManager.SENSOR_DELAY_NORMAL);
         }
@@ -72,6 +77,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     }
 
+    //low pass filter to get smoother results.
     protected float[] lowPass( float[] input, float[] output ) {
         if ( output == null ) return input;
 
@@ -89,21 +95,53 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     public void onStopClick(View view) {
         capturingData = false;
-        distance = 0;
+    }
+
+    public void onResetClick(View view){
+        capturingData = false;
         mstepCount = 0;
+        stepCount_text.setText(String.format("%d", mstepCount));
+
+        mGravity[0] = 0;
+        mGravity[1] = 0;
+        mGravity[2] = 0;
+        ax_text.setText(String.format("%.2f m/s^2", mGravity[0]));
+        ay_text.setText(String.format("%.2f m/s^2", mGravity[1]));
+        az_text.setText(String.format("%.2f m/s^2", mGravity[2]));
+
+        pitch = 0;
+        azimuth = 0;
+        roll = 0;
+        pitch_text.setText(String.format("%.2f\u00b0", pitch));
+        azimuth_text.setText(String.format("%.2f\u00b0", azimuth));
+        roll_text.setText(String.format("%.2f\u00b0", roll));
+
         dTa[0] = 0;
         dTa[1] = 0;
         dTa[2] = 0;
+        dts.setText(String.format("%.2f s",dTa[0]));
+        dtw.setText(String.format("%.2f s",dTa[1]));
+        dtr.setText(String.format("%.2f s",dTa[2]));
 
+        speed = 0;
+        distance = 0;
+        speed_text.setText(String.format("%.2f m/s",speed));
+        distance_text.setText(String.format("%.2f m",distance));
+
+        myactivity = "RESET";
+        current_activity_text.setText(myactivity);
     }
 
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
 
-        if(capturingData && sensorEvent.sensor.getType() == Sensor.TYPE_STEP_DETECTOR){
-            if (sensorEvent.values[0] == 1.0f) {
-                mstepCount++;
+        if(capturingData && sensorEvent.sensor.getType() == Sensor.TYPE_STEP_COUNTER){
+            if (counterSteps < 1) {
+                // initial value
+                counterSteps = (int)sensorEvent.values[0];
             }
+            // Calculate steps taken based on first counter value received.
+            mstepCount = (int)sensorEvent.values[0] - counterSteps;
             Log.v("step", String.valueOf(mstepCount));
             stepCount_text.setText(String.format("%d", mstepCount));
         }
@@ -118,15 +156,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             mGeomagnetic = sensorEvent.values;
         }
 
-        if(mGravity != null & mGeomagnetic != null){
+        if(capturingData && mGravity != null && mGeomagnetic != null){
             float R[] = new float[9];
             float I[] = new float[9];
             if(sensorManager.getRotationMatrix(R, I, mGravity, mGeomagnetic)){
                 float orientation[] = new float[3];
                 sensorManager.getOrientation(R, orientation);
-                float azimuth = (float)Math.toDegrees((double)orientation[0]);
-                float pitch = (float)Math.toDegrees((double)orientation[1]);
-                float roll = (float)Math.toDegrees((double)orientation[2]);
+                azimuth = (float)Math.toDegrees((double)orientation[0]);
+                pitch = (float)Math.toDegrees((double)orientation[1]);
+                roll = (float)Math.toDegrees((double)orientation[2]);
 
                 if (Math.abs(pitch) < VALUE_DRIFT){
                     pitch = 0;
@@ -148,9 +186,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
             float x,y,z;
             double normal;
-            double vx,vy,vz,speed;
-
-            String myactivity;
+            double vx,vy,vz;
 
             mAcceleration = lowPass(sensorEvent.values.clone(), sensorEvent.values);
 
@@ -200,19 +236,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             Log.v("Accelerometer", textdata);
 
-//            runOnUiThread(new Runnable() {
-//                @Override
-//                public void run() {
-//                    textView.setText(textdata);
-//                }
-//            });
-
             timestamp = sensorEvent.timestamp;
         }
     }
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int i) {}
-
 
 }
